@@ -52,6 +52,8 @@ export interface CreateIssueInput {
   assignee?: string;
   labels?: string[];
   components?: string[];
+  // Pass-through map for Jira custom fields (e.g., { customfield_10211: 10015 })
+  customFields?: Record<string, any>;
 }
 
 export interface UpdateIssueInput {
@@ -61,6 +63,8 @@ export interface UpdateIssueInput {
   priority?: string;
   labels?: string[];
   status?: string;
+  // Pass-through map for Jira custom fields to update
+  customFields?: Record<string, any>;
 }
 
 export interface JiraComment {
@@ -138,6 +142,11 @@ export class JiraClient {
       issueData.fields.components = input.components.map(c => ({ name: c }));
     }
 
+    // Merge any provided custom fields directly into the fields payload
+    if (input.customFields && typeof input.customFields === 'object') {
+      Object.assign(issueData.fields, input.customFields);
+    }
+
     const response = await this.client.post('/issue', issueData);
     return await this.getIssue(response.data.key);
   }
@@ -165,6 +174,11 @@ export class JiraClient {
 
     if (input.labels) {
       updateData.fields.labels = input.labels;
+    }
+
+    // Merge any provided custom fields directly into the fields payload
+    if (input.customFields && typeof input.customFields === 'object') {
+      Object.assign(updateData.fields, input.customFields);
     }
 
     await this.client.put(`/issue/${issueKey}`, updateData);
