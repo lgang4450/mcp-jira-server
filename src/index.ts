@@ -12,6 +12,7 @@ import { JiraClient, CreateIssueInput, UpdateIssueInput } from './jira-client.js
 // Environment variables
 const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
 const JIRA_PAT = process.env.JIRA_PAT;
+const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
 
 // Function to check if environment variables are configured
 function checkEnvironmentConfig(): { isConfigured: boolean; error?: string } {
@@ -39,10 +40,12 @@ function getJiraClient(): JiraClient {
   if (!jiraClient) {
     const JIRA_BASE_URL = process.env.JIRA_BASE_URL!;
     const JIRA_PAT = process.env.JIRA_PAT!;
+    const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
     
     jiraClient = new JiraClient({
       baseUrl: JIRA_BASE_URL,
       personalAccessToken: JIRA_PAT,
+      userAgent: JIRA_USER_AGENT,
     });
   }
   

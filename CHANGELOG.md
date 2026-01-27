@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Optional User-Agent header support for Jira instances behind reverse proxies (oauth2-proxy, nginx, etc.)
+- New optional environment variable `JIRA_USER_AGENT` to set custom User-Agent header
+- This is useful when your Jira instance is behind a reverse proxy that filters/whitelists API clients by User-Agent header
+
 ### Planned Features
 - Support for Jira Cloud instances
 - Webhook integration

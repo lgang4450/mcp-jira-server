@@ -3,6 +3,7 @@ import axios, { AxiosInstance } from 'axios';
 export interface JiraConfig {
   baseUrl: string;
   personalAccessToken: string;
+  userAgent?: string;
 }
 
 export interface JiraIssue {
@@ -85,13 +86,19 @@ export class JiraClient {
   constructor(config: JiraConfig) {
     this.baseUrl = config.baseUrl;
     
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${config.personalAccessToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+    
+    if (config.userAgent) {
+      headers['User-Agent'] = config.userAgent;
+    }
+    
     this.client = axios.create({
       baseURL: `${config.baseUrl}/rest/api/2`,
-      headers: {
-        'Authorization': `Bearer ${config.personalAccessToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
+      headers
     });
   }
 

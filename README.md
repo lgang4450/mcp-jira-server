@@ -145,6 +145,7 @@ Create or update `.vscode/mcp.json` in your workspace:
 
 - `JIRA_BASE_URL`: The base URL of your self-hosted Jira instance (e.g., `https://jira.domain.com`)
 - `JIRA_PAT`: Your Personal Access Token
+- `JIRA_USER_AGENT` (optional): Custom User-Agent header for Jira instances behind reverse proxies (oauth2-proxy, nginx, etc.) that filter requests by User-Agent. If your API requests get redirected to SSO login despite valid PAT, your reverse proxy may require a specific User-Agent to bypass authentication for API clients.
 
 ## Available Tools
 
@@ -340,6 +341,7 @@ After configuring the server, restart Claude Desktop or VS Code to load the new 
 - **"Connection refused"**: Check if Jira server is accessible and URL is correct
 - **"Unauthorized"**: Verify your Personal Access Token
 - **"Issue type not found"**: Use `jira_get_issue_types` to see valid types for the project
+- **API requests redirect to SSO login**: Your Jira may be behind a reverse proxy (oauth2-proxy, nginx) that filters by User-Agent. Set `JIRA_USER_AGENT` environment variable to a whitelisted User-Agent string. Contact your system administrator to get the allowed User-Agent value.
 
 ## Security Best Practices
 
