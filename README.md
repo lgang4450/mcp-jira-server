@@ -190,10 +190,16 @@ Create a new Jira issue.
 - `assignee` (string, optional): Username to assign to
 - `labels` (array, optional): Array of labels
 - `components` (array, optional): Array of component names
+- Custom fields: Any additional parameters prefixed with `customfield_` (e.g., `customfield_10001`)
 
 **Example:**
 ```
 Create a new bug in project PROJ with summary "Login page not loading" and high priority
+```
+
+**Custom Fields Example:**
+```
+Create a story in PROJ with custom field customfield_10001 set to "Sprint 1"
 ```
 
 ### 4. `jira_update_issue`
@@ -207,6 +213,7 @@ Update an existing Jira issue.
 - `priority` (string, optional): New priority
 - `labels` (array, optional): New labels array
 - `status` (string, optional): New status (e.g., "In Progress", "Done")
+- Custom fields: Any additional parameters prefixed with `customfield_` (e.g., `customfield_10002`)
 
 **Example:**
 ```

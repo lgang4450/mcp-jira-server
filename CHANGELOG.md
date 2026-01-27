@@ -5,6 +5,22 @@ All notable changes to the MCP Jira Server project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-01-27
+
+### Added
+- Custom fields support in `jira_create_issue` and `jira_update_issue` tools
+- Optional User-Agent header support for Jira instances behind reverse proxies
+- New environment variable `JIRA_USER_AGENT` for custom User-Agent configuration
+- Enhanced compatibility with reverse proxies (oauth2-proxy, nginx, etc.)
+
+### Changed
+- Updated dependencies to address security vulnerabilities
+- Improved error handling for custom field operations
+
+### Fixed
+- Security vulnerabilities in dependencies (axios, follow-redirects)
+- Custom field handling in issue creation and updates
+
 ## [1.0.2] - 2025-10-08
 
 ### Added
@@ -50,23 +66,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Optional User-Agent header support for Jira instances behind reverse proxies (oauth2-proxy, nginx, etc.)
-- New optional environment variable `JIRA_USER_AGENT` to set custom User-Agent header
-- This is useful when your Jira instance is behind a reverse proxy that filters/whitelists API clients by User-Agent header
-
 ### Planned Features
 - Support for Jira Cloud instances
 - Webhook integration
 - Batch operations
-- Custom field support
 - Attachment management
 - Advanced reporting features
+- QMetry test management integration
 
 ---
 
 ## Release History
 
+- **1.0.3** (2026-01-27) - Custom fields & security updates
 - **1.0.2** (2025-10-08) - Initial public release
 - **1.0.1** (2025-10-08) - Pre-release version
 - **1.0.0** (2025-10-08) - Development version

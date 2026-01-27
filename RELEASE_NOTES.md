@@ -1,5 +1,81 @@
 # MCP Jira Server - Release Notes
 
+## 🚀 Version 1.0.3 - January 27, 2026
+
+### 🎯 Custom Fields & Security Updates
+
+This release adds support for custom fields and addresses important security vulnerabilities.
+
+### ✨ What's New
+
+#### 🎨 **Custom Fields Support**
+- **Create with Custom Fields**: Set custom field values when creating new issues
+- **Update Custom Fields**: Modify custom field values in existing issues
+- **Flexible Field Mapping**: Support for any custom field ID with proper value formatting
+- **Type Safety**: Proper handling of different custom field types
+
+#### 🔒 **Security Updates**
+- **Updated axios** from 1.7.7 to 1.7.9 to address security vulnerabilities
+- **Fixed follow-redirects** vulnerabilities in dependency tree
+- All known security issues resolved
+
+#### 🌐 **Reverse Proxy Support**
+- **Custom User-Agent**: New `JIRA_USER_AGENT` environment variable
+- **Proxy Compatibility**: Works with oauth2-proxy, nginx, and other reverse proxies
+- **Header Whitelisting**: Support for API client filtering by User-Agent
+
+### 📦 Package Information
+- **npm Package**: `mcp-jira-server`
+- **Version**: 1.0.3
+- **License**: MIT
+
+### 🔧 **Configuration**
+
+#### New Environment Variable
+```bash
+JIRA_BASE_URL="https://your-jira-instance.com"
+JIRA_PAT="your-personal-access-token"
+JIRA_USER_AGENT="YourCustomUserAgent/1.0"  # Optional
+```
+
+### 📋 **Updated Tools**
+
+#### Enhanced Tools
+- `jira_create_issue` - Now supports custom fields via optional parameters
+- `jira_update_issue` - Can update custom field values
+
+#### Example: Using Custom Fields
+```typescript
+// Create issue with custom fields
+{
+  "projectKey": "PROJ",
+  "summary": "New feature",
+  "issueType": "Story",
+  "customfield_10001": "Custom value",
+  "customfield_10002": {"value": "Option 1"}
+}
+```
+
+### 🔄 **Migration from 1.0.2**
+
+No breaking changes! Simply update:
+```bash
+npm update mcp-jira-server
+```
+
+Or for npx users, it will automatically use the latest version:
+```bash
+npx mcp-jira-server
+```
+
+### 🙏 **Contributors**
+
+Special thanks to:
+- [@masoudsharifipour](https://github.com/masoudsharifipour) - Custom fields support
+- [@eliasadvansys](https://github.com/eliasadvansys) - User-Agent header support
+
+---
+
 ## 🚀 Version 1.0.2 - October 8, 2025
 
 ### 🎉 Initial Public Release
