@@ -128,6 +128,11 @@ const tools: Tool[] = [
           },
           description: 'Array of component names',
         },
+        customFields: {
+          type: 'object',
+          description: 'Map of additional Jira field IDs/keys (e.g., customfield_10211) to include in the fields payload',
+          additionalProperties: true,
+        },
       },
       required: ['projectKey', 'summary', 'issueType'],
     },
@@ -168,6 +173,11 @@ const tools: Tool[] = [
         status: {
           type: 'string',
           description: 'New status/workflow state (e.g., "In Progress", "Done")',
+        },
+        customFields: {
+          type: 'object',
+          description: 'Map of additional Jira field IDs/keys (e.g., customfield_10211) to include in the fields payload',
+          additionalProperties: true,
         },
       },
       required: ['issueKey'],
@@ -346,6 +356,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           assignee: args.assignee as string,
           labels: args.labels as string[],
           components: args.components as string[],
+          customFields: args.customFields as Record<string, any>,
         };
         const issue = await getJiraClient().createIssue(input);
         return {
@@ -365,6 +376,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           assignee: args.assignee as string,
           priority: args.priority as string,
           labels: args.labels as string[],
+          customFields: args.customFields as Record<string, any>,
           status: args.status as string,
         };
         const issue = await getJiraClient().updateIssue(args.issueKey as string, input);
