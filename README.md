@@ -10,6 +10,7 @@ A Model Context Protocol (MCP) server for interacting with self-hosted Jira inst
 - ✅ Add and view comments
 - ✅ Manage issue assignments
 - ✅ List projects and issue types
+- ✅ Create and remove issue links
 - ✅ Transition issues between statuses
 - ✅ Get current user information
 
@@ -260,14 +261,74 @@ Get available issue types for a project.
 **Parameters:**
 - `projectKey` (string, required): Project key
 
-### 10. `jira_assign_issue`
+### 10. `jira_get_issue_link_types`
+Get available Jira issue link types, including their `name`, `outward`, and `inward` text.
+
+**Parameters:** None
+
+**Example:**
+```
+Show me the available Jira issue link types
+```
+
+### 11. `jira_create_issue_link`
+Create a Jira issue link between two issues.
+
+**Parameters:**
+- `fromIssueKey` (string, required): Source issue key
+- `toIssueKey` (string, required): Target issue key
+- `relationship` (string, required): Link type name or directional text, such as `Relates`, `blocks`, `is blocked by`, `duplicates`
+- `comment` (string, optional): Comment to add while creating the link
+
+**Direction Rules:**
+- The `relationship` is interpreted from `fromIssueKey` to `toIssueKey`
+- Example: `fromIssueKey=PROJ-1`, `toIssueKey=PROJ-2`, `relationship="blocks"` means `PROJ-1` blocks `PROJ-2`
+- Example: `fromIssueKey=PROJ-1`, `toIssueKey=PROJ-2`, `relationship="is blocked by"` means `PROJ-1` is blocked by `PROJ-2`
+- If you pass a link type name like `Blocks` or `Duplicate`, the server uses the type's outward direction by default
+
+**Examples:**
+```
+Create an issue link where PROJ-101 blocks PROJ-202
+```
+
+```
+Create an issue link from PROJ-202 to PROJ-101 with relationship "is blocked by"
+```
+
+```
+Link PROJ-300 to PROJ-301 as duplicates
+```
+
+### 12. `jira_delete_issue_link`
+Delete a Jira issue link.
+
+**Parameters:**
+- `linkId` (string, optional): Delete directly by Jira issue link ID
+- `fromIssueKey` (string, optional): Source issue key when deleting by relationship
+- `toIssueKey` (string, optional): Target issue key when deleting by relationship
+- `relationship` (string, optional): Relationship or type used to resolve the link
+
+**Usage Notes:**
+- Provide either `linkId`
+- Or provide `fromIssueKey`, `toIssueKey`, and `relationship`
+
+**Examples:**
+```
+Delete the issue link with ID 12345
+```
+
+```
+Delete the issue link where PROJ-101 blocks PROJ-202
+```
+
+### 13. `jira_assign_issue`
 Assign a Jira issue to a user.
 
 **Parameters:**
 - `issueKey` (string, required): Issue key
 - `assignee` (string, required): Username to assign to
 
-### 11. `jira_delete_issue`
+### 14. `jira_delete_issue`
 Delete a Jira issue permanently.
 
 **Parameters:**
@@ -275,7 +336,7 @@ Delete a Jira issue permanently.
 
 **⚠️ Warning:** This action is permanent and cannot be undone.
 
-### 12. `jira_get_current_user`
+### 15. `jira_get_current_user`
 Get information about the currently authenticated user.
 
 **Parameters:** None
@@ -323,6 +384,11 @@ After configuring the server, restart Claude Desktop or VS Code to load the new 
    Create a new task in project PROJ with summary "Test MCP integration"
    ```
 
+5. **Create an issue link:**
+   ```
+   Create an issue link where PROJ-101 blocks PROJ-102
+   ```
+
 ## Troubleshooting
 
 ### Server not connecting
@@ -348,6 +414,7 @@ After configuring the server, restart Claude Desktop or VS Code to load the new 
 - **"Connection refused"**: Check if Jira server is accessible and URL is correct
 - **"Unauthorized"**: Verify your Personal Access Token
 - **"Issue type not found"**: Use `jira_get_issue_types` to see valid types for the project
+- **"Issue link relationship not found"**: Use `jira_get_issue_link_types` to see valid link types and their inward/outward text
 - **API requests redirect to SSO login**: Your Jira may be behind a reverse proxy (oauth2-proxy, nginx) that filters by User-Agent. Set `JIRA_USER_AGENT` environment variable to a whitelisted User-Agent string. Contact your system administrator to get the allowed User-Agent value.
 
 ## Security Best Practices

@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `jira_get_issue_link_types` to list all available Jira issue link types and their inward/outward relationship text
+- `jira_create_issue_link` to create links such as `Relates`, `Blocks`, `Duplicate`, and any other link type configured in Jira
+- `jira_delete_issue_link` to delete links either by Jira link ID or by resolving them from issue keys plus a relationship
+
+### Changed
+- Issue link creation now resolves relationship text case-insensitively by link type name, `outward`, or `inward` phrases
+
 ### Planned Features
 - Support for Jira Cloud instances
 - Webhook integration

@@ -7,7 +7,13 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { JiraClient, CreateIssueInput, UpdateIssueInput } from './jira-client.js';
+import {
+  JiraClient,
+  CreateIssueInput,
+  UpdateIssueInput,
+  CreateIssueLinkInput,
+  DeleteIssueLinkInput,
+} from './jira-client.js';
 
 // Environment variables
 const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
@@ -255,6 +261,73 @@ const tools: Tool[] = [
     },
   },
   {
+    name: 'jira_get_issue_link_types',
+    description: 'Get available Jira issue link types with their outward and inward relationship text (e.g., Blocks, Duplicate, Relates)',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'jira_create_issue_link',
+    description: 'Create a Jira issue link between two issues. The relationship can be a link type name (e.g., "Blocks", "Duplicate", "Relates") or directional text (e.g., "blocks", "is blocked by", "duplicates").',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromIssueKey: {
+          type: 'string',
+          description: 'Source issue key for the relationship you want to express',
+        },
+        toIssueKey: {
+          type: 'string',
+          description: 'Target issue key for the relationship you want to express',
+        },
+        relationship: {
+          type: 'string',
+          description: 'Link relationship or type name, such as "blocks", "is blocked by", "duplicates", or "Relates"',
+        },
+        comment: {
+          type: 'string',
+          description: 'Optional comment to add while creating the link',
+        },
+      },
+      required: ['fromIssueKey', 'toIssueKey', 'relationship'],
+    },
+  },
+  {
+    name: 'jira_delete_issue_link',
+    description: 'Delete a Jira issue link either by linkId or by resolving it from two issue keys and a relationship',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        linkId: {
+          type: 'string',
+          description: 'Issue link ID to delete directly',
+        },
+        fromIssueKey: {
+          type: 'string',
+          description: 'Source issue key when deleting by relationship instead of linkId',
+        },
+        toIssueKey: {
+          type: 'string',
+          description: 'Target issue key when deleting by relationship instead of linkId',
+        },
+        relationship: {
+          type: 'string',
+          description: 'Relationship or link type used to resolve the link, such as "blocks" or "Relates"',
+        },
+      },
+      oneOf: [
+        {
+          required: ['linkId'],
+        },
+        {
+          required: ['fromIssueKey', 'toIssueKey', 'relationship'],
+        },
+      ],
+    },
+  },
+  {
     name: 'jira_assign_issue',
     description: 'Assign a Jira issue to a user',
     inputSchema: {
@@ -451,6 +524,54 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(issueTypes, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'jira_get_issue_link_types': {
+        const issueLinkTypes = await getJiraClient().getIssueLinkTypes();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(issueLinkTypes, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'jira_create_issue_link': {
+        const input: CreateIssueLinkInput = {
+          fromIssueKey: args.fromIssueKey as string,
+          toIssueKey: args.toIssueKey as string,
+          relationship: args.relationship as string,
+          comment: args.comment as string,
+        };
+        const issueLink = await getJiraClient().createIssueLink(input);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully created an issue link between ${args.fromIssueKey} and ${args.toIssueKey}\n\n${JSON.stringify(issueLink, null, 2)}`,
+            },
+          ],
+        };
+      }
+
+      case 'jira_delete_issue_link': {
+        const input: DeleteIssueLinkInput = {
+          linkId: args.linkId as string,
+          fromIssueKey: args.fromIssueKey as string,
+          toIssueKey: args.toIssueKey as string,
+          relationship: args.relationship as string,
+        };
+        const result = await getJiraClient().deleteIssueLink(input);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully deleted issue link${args.linkId ? ` ${args.linkId}` : ''}\n\n${JSON.stringify(result, null, 2)}`,
             },
           ],
         };
