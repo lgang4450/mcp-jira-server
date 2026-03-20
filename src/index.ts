@@ -19,6 +19,8 @@ import {
 const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
 const JIRA_PAT = process.env.JIRA_PAT;
 const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
+const JIRA_ALLOW_ISSUE_DELETE = process.env.JIRA_ALLOW_ISSUE_DELETE === 'true';
+const DELETE_ISSUE_CONFIRMATION_VALUE = 'DELETE';
 
 // Function to check if environment variables are configured
 function checkEnvironmentConfig(): { isConfigured: boolean; error?: string } {
@@ -139,7 +141,10 @@ const tools: Tool[] = [
         },
         customFields: {
           type: 'object',
-          description: 'Map of additional Jira field IDs/keys (e.g., customfield_10211) to include in the fields payload',
+          description: 'Map of Jira custom fields only (keys must match customfield_<digits>, e.g., customfield_10211)',
+          propertyNames: {
+            pattern: '^customfield_[0-9]+$',
+          },
           additionalProperties: true,
         },
       },
@@ -185,7 +190,10 @@ const tools: Tool[] = [
         },
         customFields: {
           type: 'object',
-          description: 'Map of additional Jira field IDs/keys (e.g., customfield_10211) to include in the fields payload',
+          description: 'Map of Jira custom fields only (keys must match customfield_<digits>, e.g., customfield_10211)',
+          propertyNames: {
+            pattern: '^customfield_[0-9]+$',
+          },
           additionalProperties: true,
         },
       },
@@ -355,8 +363,12 @@ const tools: Tool[] = [
           type: 'string',
           description: 'The Jira issue key to delete',
         },
+        confirmation: {
+          type: 'string',
+          description: 'Must be exactly "DELETE" to confirm permanent deletion',
+        },
       },
-      required: ['issueKey'],
+      required: ['issueKey', 'confirmation'],
     },
   },
   {
@@ -368,6 +380,10 @@ const tools: Tool[] = [
     },
   },
 ];
+
+const availableTools = JIRA_ALLOW_ISSUE_DELETE
+  ? tools
+  : tools.filter(tool => tool.name !== 'jira_delete_issue');
 
 // Create server instance
 const server = new Server(
@@ -385,7 +401,7 @@ const server = new Server(
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools,
+    tools: availableTools,
   };
 });
 
@@ -432,7 +448,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           assignee: args.assignee as string,
           labels: args.labels as string[],
           components: args.components as string[],
-          customFields: args.customFields as Record<string, any>,
+          customFields: args.customFields as Record<string, unknown>,
         };
         const issue = await getJiraClient().createIssue(input);
         return {
@@ -452,7 +468,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           assignee: args.assignee as string,
           priority: args.priority as string,
           labels: args.labels as string[],
-          customFields: args.customFields as Record<string, any>,
+          customFields: args.customFields as Record<string, unknown>,
           status: args.status as string,
         };
         const issue = await getJiraClient().updateIssue(args.issueKey as string, input);
@@ -590,6 +606,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'jira_delete_issue': {
+        if (!JIRA_ALLOW_ISSUE_DELETE) {
+          throw new Error('Issue deletion is disabled. Set JIRA_ALLOW_ISSUE_DELETE=true to enable jira_delete_issue.');
+        }
+
+        if (args.confirmation !== DELETE_ISSUE_CONFIRMATION_VALUE) {
+          throw new Error(`Deletion requires explicit confirmation: confirmation="${DELETE_ISSUE_CONFIRMATION_VALUE}"`);
+        }
+
         await getJiraClient().deleteIssue(args.issueKey as string);
         return {
           content: [

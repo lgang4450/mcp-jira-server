@@ -1,5 +1,33 @@
 import axios, { AxiosInstance } from 'axios';
 
+const CUSTOM_FIELD_KEY_PATTERN = /^customfield_\d+$/;
+const BLOCKED_CUSTOM_FIELD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function sanitizeCustomFields(customFields?: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (customFields === undefined) {
+    return undefined;
+  }
+
+  if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) {
+    throw new Error('customFields must be an object with keys in the format customfield_<id>.');
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(customFields)) {
+    if (BLOCKED_CUSTOM_FIELD_KEYS.has(key)) {
+      throw new Error(`Blocked custom field key: ${key}`);
+    }
+
+    if (!CUSTOM_FIELD_KEY_PATTERN.test(key)) {
+      throw new Error(`Invalid custom field key: ${key}. Only keys matching customfield_<digits> are allowed.`);
+    }
+
+    sanitized[key] = value;
+  }
+
+  return sanitized;
+}
+
 const ISSUE_LINK_TYPE_SEPARATOR = ', ';
 
 function normalizeIssueLinkRelationship(value: string): string {
@@ -131,7 +159,7 @@ export interface CreateIssueInput {
   labels?: string[];
   components?: string[];
   // Pass-through map for Jira custom fields (e.g., { customfield_10211: 10015 })
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 export interface UpdateIssueInput {
@@ -142,7 +170,7 @@ export interface UpdateIssueInput {
   labels?: string[];
   status?: string;
   // Pass-through map for Jira custom fields to update
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 export interface JiraComment {
@@ -226,9 +254,9 @@ export class JiraClient {
       issueData.fields.components = input.components.map(c => ({ name: c }));
     }
 
-    // Merge any provided custom fields directly into the fields payload
-    if (input.customFields && typeof input.customFields === 'object') {
-      Object.assign(issueData.fields, input.customFields);
+    const sanitizedCustomFields = sanitizeCustomFields(input.customFields);
+    if (sanitizedCustomFields) {
+      Object.assign(issueData.fields, sanitizedCustomFields);
     }
 
     const response = await this.client.post('/issue', issueData);
@@ -260,9 +288,9 @@ export class JiraClient {
       updateData.fields.labels = input.labels;
     }
 
-    // Merge any provided custom fields directly into the fields payload
-    if (input.customFields && typeof input.customFields === 'object') {
-      Object.assign(updateData.fields, input.customFields);
+    const sanitizedCustomFields = sanitizeCustomFields(input.customFields);
+    if (sanitizedCustomFields) {
+      Object.assign(updateData.fields, sanitizedCustomFields);
     }
 
     await this.client.put(`/issue/${issueKey}`, updateData);
