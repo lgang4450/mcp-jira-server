@@ -464,7 +464,9 @@ export class JiraClient {
   }
 
   async downloadAttachment(attachmentId: string): Promise<JiraAttachmentDownload> {
-    const metadata = await this.getAttachment(attachmentId);
+    const metadataResponse = await this.client.get<JiraAttachment>(`/attachment/${attachmentId}`);
+    const metadata = metadataResponse.data;
+    const cookieHeader = this.buildCookieHeader(metadataResponse.headers['set-cookie']);
 
     if (!metadata.content) {
       throw new Error(`Attachment ${attachmentId} does not provide a downloadable content URL.`);
@@ -473,6 +475,7 @@ export class JiraClient {
     const response = await this.client.get<ArrayBuffer>(this.resolveJiraUrl(metadata.content), {
       headers: {
         Accept: '*/*',
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
       },
       responseType: 'arraybuffer',
       transformResponse: response => response,
@@ -573,5 +576,18 @@ export class JiraClient {
 
   private resolveJiraUrl(pathOrUrl: string): string {
     return new URL(pathOrUrl, this.baseUrl).toString();
+  }
+
+  private buildCookieHeader(setCookieHeader?: string | string[]): string | undefined {
+    const cookieValues = (Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader])
+      .filter((cookie): cookie is string => typeof cookie === 'string' && cookie.length > 0)
+      .map(cookie => cookie.split(';', 1)[0]?.trim())
+      .filter((cookie): cookie is string => typeof cookie === 'string' && cookie.length > 0);
+
+    if (cookieValues.length === 0) {
+      return undefined;
+    }
+
+    return cookieValues.join('; ');
   }
 }
