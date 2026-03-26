@@ -1,79 +1,107 @@
-# MCP Jira Server for Self-Hosted Jira
+# mcp-jira-server
 
-A Model Context Protocol (MCP) server for interacting with self-hosted Jira instances using Personal Access Token (PAT) authentication.
+MCP server for self-hosted Jira instances using Personal Access Token (PAT) authentication.
 
-## Features
+This project exposes Jira operations as MCP tools so assistants such as Claude Desktop, VS Code, or any MCP-compatible client can search issues, update tickets, manage links, and download attachments from a Jira Server / Data Center deployment.
 
-- ✅ Personal Access Token authentication for self-hosted Jira
-- ✅ Create, read, update, and delete Jira issues
-- ✅ Search issues using JQL (Jira Query Language)
-- ✅ Add and view comments
-- ✅ Manage issue assignments
-- ✅ List projects and issue types
-- ✅ Create and remove issue links
-- ✅ Transition issues between statuses
-- ✅ Get current user information
+## What This Repository Does
 
-## Prerequisites
+- Connects to a self-hosted Jira instance over the Jira REST API v2
+- Authenticates with a Jira Personal Access Token
+- Exposes Jira capabilities as MCP tools over `stdio`
+- Supports issue search, create, update, comments, assignments, projects, issue types, links, current user lookup, and attachments
+- Keeps issue deletion disabled by default behind an explicit safety flag
 
-- Node.js 18 or higher
-- A self-hosted Jira instance (e.g., https://jira.domain.com)
-- A Jira Personal Access Token
+## Scope
 
-## How to Create a Personal Access Token in Self-Hosted Jira
+- Supported: self-hosted Jira / Jira Server / Jira Data Center style deployments using PAT auth
+- Not targeted: Jira Cloud
+- Transport: `stdio`
+- Runtime: Node.js 18+
 
-1. Log in to your Jira instance (e.g., https://jira.domain.com)
-2. Click on your profile icon in the top right corner
-3. Select **"Profile"** or **"Account Settings"**
-4. Navigate to **"Personal Access Tokens"** or **"Security"**
-5. Click **"Create token"**
-6. Give your token a name (e.g., "MCP Server")
-7. Set an expiration date (optional but recommended)
-8. Click **"Create"**
-9. **Copy the token immediately** - you won't be able to see it again!
+## Tool Summary
 
-## Installation
+| Tool | Purpose |
+| --- | --- |
+| `jira_get_issue` | Fetch a single issue by key |
+| `jira_search_issues` | Run JQL search queries |
+| `jira_create_issue` | Create a new issue |
+| `jira_update_issue` | Update fields and optionally transition status |
+| `jira_add_comment` | Add a comment to an issue |
+| `jira_get_comments` | List comments for an issue |
+| `jira_get_projects` | List Jira projects |
+| `jira_get_project` | Fetch one project |
+| `jira_get_issue_types` | List issue types for a project |
+| `jira_get_issue_link_types` | List available issue link types |
+| `jira_create_issue_link` | Create a link between issues |
+| `jira_delete_issue_link` | Delete a link by ID or relationship |
+| `jira_assign_issue` | Assign an issue |
+| `jira_delete_issue` | Permanently delete an issue, if explicitly enabled |
+| `jira_get_current_user` | Return the authenticated Jira user |
+| `jira_get_attachment` | Fetch attachment metadata |
+| `jira_download_attachment` | Download attachment content through authenticated MCP access |
 
-### Option 1: Using npm (Recommended)
+## Requirements
 
-**Direct usage with npx:**
+- Node.js 18 or newer
+- A reachable self-hosted Jira base URL such as `https://jira.example.com`
+- A Jira Personal Access Token with the permissions required for the operations you want to perform
+
+## Install
+
+### Option 1: Run from npm
+
 ```bash
-npx mcp-jira-server
+npx -y mcp-jira-server
 ```
 
-**Or install globally:**
+or install globally:
+
 ```bash
 npm install -g mcp-jira-server
 ```
 
-### Option 2: From Source
+### Option 2: Run from source
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/edrich13/mcp-jira-server.git
 cd mcp-jira-server
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Build the server:
-```bash
 npm run build
 ```
 
 ## Configuration
 
-### For Claude Desktop
+The server reads configuration from environment variables.
 
-Add the following to your Claude Desktop configuration file:
+| Variable | Required | Description |
+| --- | --- | --- |
+| `JIRA_BASE_URL` | Yes | Base URL of your Jira instance, for example `https://jira.example.com` |
+| `JIRA_PAT` | Yes | Jira Personal Access Token |
+| `JIRA_USER_AGENT` | No | Custom `User-Agent` for environments behind SSO proxies or reverse proxies |
+| `JIRA_ALLOW_ISSUE_DELETE` | No | Set to `true` to expose the destructive `jira_delete_issue` tool |
 
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+Example `.env` values:
 
-**Option 1: Using npx (Recommended)**
+```env
+JIRA_BASE_URL=https://jira.example.com
+JIRA_PAT=your_personal_access_token
+# JIRA_USER_AGENT=YourAllowedUserAgent/1.0
+# JIRA_ALLOW_ISSUE_DELETE=false
+```
+
+The repository also includes:
+
+- `claude_desktop_config.example.json`
+- `vscode_mcp_config.example.json`
+- `.env.example`
+
+## Quick Start
+
+### Claude Desktop
+
+Using the published package:
+
 ```json
 {
   "mcpServers": {
@@ -81,52 +109,35 @@ Add the following to your Claude Desktop configuration file:
       "command": "npx",
       "args": ["-y", "mcp-jira-server"],
       "env": {
-        "JIRA_BASE_URL": "https://jira.domain.com",
-        "JIRA_PAT": "your-personal-access-token-here"
+        "JIRA_BASE_URL": "https://jira.example.com",
+        "JIRA_PAT": "your-personal-access-token"
       }
     }
   }
 }
 ```
 
-**Option 2: Using source build**
+Using a local build from this repository:
+
 ```json
 {
   "mcpServers": {
     "jira": {
-      "type": "stdio",
       "command": "node",
-      "args": ["/Users/edrich.rocha/.nvm/versions/node/v22.6.0/bin/mcp-jira-server"],
+      "args": ["/absolute/path/to/mcp-jira-server/build/index.js"],
       "env": {
-        "JIRA_BASE_URL": "https://jira.domain.com",
-        "JIRA_PAT": "your-personal-access-token-here"
+        "JIRA_BASE_URL": "https://jira.example.com",
+        "JIRA_PAT": "your-personal-access-token"
       }
     }
   }
 }
 ```
 
-### For VS Code with MCP
+### VS Code MCP
 
-Create or update `.vscode/mcp.json` in your workspace:
+Add to `.vscode/mcp.json`:
 
-**Option 1: Using npx (Recommended)**
-```json
-{
-  "servers": {
-    "jira": {
-      "command": "npx",
-      "args": ["-y", "mcp-jira-server"],
-      "env": {
-        "JIRA_BASE_URL": "https://jira.domain.com",
-        "JIRA_PAT": "your-personal-access-token-here"
-      }
-    }
-  }
-}
-```
-
-**Option 2: Using source build**
 ```json
 {
   "servers": {
@@ -134,355 +145,304 @@ Create or update `.vscode/mcp.json` in your workspace:
       "command": "node",
       "args": ["/absolute/path/to/mcp-jira-server/build/index.js"],
       "env": {
-        "JIRA_BASE_URL": "https://jira.domain.com",
-        "JIRA_PAT": "your-personal-access-token-here"
+        "JIRA_BASE_URL": "https://jira.example.com",
+        "JIRA_PAT": "your-personal-access-token"
       }
     }
   }
 }
 ```
 
-### Environment Variables
+After updating the config or rebuilding the project, restart the MCP host application so it launches the fresh server process.
 
-- `JIRA_BASE_URL`: The base URL of your self-hosted Jira instance (e.g., `https://jira.domain.com`)
-- `JIRA_PAT`: Your Personal Access Token
-- `JIRA_USER_AGENT` (optional): Custom User-Agent header for Jira instances behind reverse proxies (oauth2-proxy, nginx, etc.) that filter requests by User-Agent. If your API requests get redirected to SSO login despite valid PAT, your reverse proxy may require a specific User-Agent to bypass authentication for API clients.
-- `JIRA_ALLOW_ISSUE_DELETE` (optional, default: `false`): Set to `true` to allow the `jira_delete_issue` tool. Keep disabled unless absolutely necessary.
+## Usage Examples
 
-## Available Tools
+Example assistant requests:
 
-### 1. `jira_get_issue`
-Get details of a specific Jira issue by its key.
+- `Get issue PROJ-123`
+- `Search for all open bugs assigned to me`
+- `Create a high-priority bug in MOBILE with summary "Login spinner never stops"`
+- `Move PROJ-123 to In Progress and assign it to john.doe`
+- `Show me the available issue link types`
+- `Create an issue link where PROJ-101 blocks PROJ-202`
+- `Get attachment metadata for 10873`
+- `Download attachment 10873`
 
-**Parameters:**
-- `issueKey` (string, required): The Jira issue key (e.g., "PROJ-123")
+## Tool Details
 
-**Example:**
-```
-Get details for issue PROJ-123
-```
+### Issue tools
 
-### 2. `jira_search_issues`
-Search for Jira issues using JQL (Jira Query Language).
+#### `jira_get_issue`
 
-**Parameters:**
-- `jql` (string, required): JQL query string
-- `maxResults` (number, optional): Maximum number of results (default: 50)
+Fetch a single issue by key.
 
-**Example:**
-```
-Search for all open issues in project PROJ assigned to me
-```
+Parameters:
 
-**Common JQL Examples:**
+- `issueKey` (required)
+
+#### `jira_search_issues`
+
+Run a JQL query.
+
+Parameters:
+
+- `jql` (required)
+- `maxResults` (optional, default `50`)
+
+Examples:
+
 - `project = PROJ AND status = Open`
 - `assignee = currentUser() AND status != Done`
 - `priority = High AND created >= -7d`
-- `reporter = john.doe AND status IN (Open, "In Progress")`
 
-### 3. `jira_create_issue`
-Create a new Jira issue.
+#### `jira_create_issue`
 
-**Parameters:**
-- `projectKey` (string, required): Project key
-- `summary` (string, required): Issue title/summary
-- `issueType` (string, required): Issue type (e.g., "Bug", "Task", "Story")
-- `description` (string, optional): Detailed description
-- `priority` (string, optional): Priority level (e.g., "High", "Medium", "Low")
-- `assignee` (string, optional): Username to assign to
-- `labels` (array, optional): Array of labels
-- `components` (array, optional): Array of component names
-- `customFields` (object, optional): Only keys matching `customfield_<digits>` are accepted (e.g., `customfield_10001`)
+Create a new issue.
 
-**Example:**
-```
-Create a new bug in project PROJ with summary "Login page not loading" and high priority
-```
+Parameters:
 
-**Custom Fields Example:**
-```
-Create a story in PROJ with custom field customfield_10001 set to "Sprint 1"
-```
+- `projectKey` (required)
+- `summary` (required)
+- `issueType` (required)
+- `description` (optional)
+- `priority` (optional)
+- `assignee` (optional)
+- `labels` (optional)
+- `components` (optional)
+- `customFields` (optional)
 
-### 4. `jira_update_issue`
-Update an existing Jira issue.
+`customFields` accepts only keys matching `customfield_<digits>`.
 
-**Parameters:**
-- `issueKey` (string, required): Issue key to update
-- `summary` (string, optional): New summary
-- `description` (string, optional): New description
-- `assignee` (string, optional): New assignee username
-- `priority` (string, optional): New priority
-- `labels` (array, optional): New labels array
-- `status` (string, optional): New status (e.g., "In Progress", "Done")
-- `customFields` (object, optional): Only keys matching `customfield_<digits>` are accepted (e.g., `customfield_10002`)
+#### `jira_update_issue`
 
-**Example:**
-```
-Update issue PROJ-123 to set status to "In Progress" and assign to john.doe
-```
+Update an existing issue.
 
-### 5. `jira_add_comment`
-Add a comment to a Jira issue.
+Parameters:
 
-**Parameters:**
-- `issueKey` (string, required): Issue key
-- `comment` (string, required): Comment text
+- `issueKey` (required)
+- `summary` (optional)
+- `description` (optional)
+- `assignee` (optional)
+- `priority` (optional)
+- `labels` (optional)
+- `status` (optional)
+- `customFields` (optional)
 
-**Example:**
-```
-Add a comment to PROJ-123 saying "Fixed in latest deployment"
-```
+If `status` is provided, the server resolves the matching Jira transition and applies it after the field update.
 
-### 6. `jira_get_comments`
-Get all comments from a Jira issue.
+#### `jira_assign_issue`
 
-**Parameters:**
-- `issueKey` (string, required): Issue key
+Assign an issue to a user.
 
-### 7. `jira_get_projects`
+Parameters:
+
+- `issueKey` (required)
+- `assignee` (required)
+
+#### `jira_delete_issue`
+
+Delete an issue permanently.
+
+Parameters:
+
+- `issueKey` (required)
+- `confirmation` (required, must equal `DELETE`)
+
+This tool is only exposed when `JIRA_ALLOW_ISSUE_DELETE=true`.
+
+### Comment tools
+
+#### `jira_add_comment`
+
+Add a comment to an issue.
+
+Parameters:
+
+- `issueKey` (required)
+- `comment` (required)
+
+#### `jira_get_comments`
+
+List comments for an issue.
+
+Parameters:
+
+- `issueKey` (required)
+
+### Project and metadata tools
+
+#### `jira_get_projects`
+
 List all available Jira projects.
 
-**Parameters:** None
+#### `jira_get_project`
 
-**Example:**
+Fetch one project by key.
+
+Parameters:
+
+- `projectKey` (required)
+
+#### `jira_get_issue_types`
+
+List issue types available for a project.
+
+Parameters:
+
+- `projectKey` (required)
+
+#### `jira_get_current_user`
+
+Return the currently authenticated Jira user.
+
+### Issue link tools
+
+#### `jira_get_issue_link_types`
+
+List the issue link types configured in Jira, including `name`, `outward`, and `inward` text.
+
+#### `jira_create_issue_link`
+
+Create a link between two issues.
+
+Parameters:
+
+- `fromIssueKey` (required)
+- `toIssueKey` (required)
+- `relationship` (required)
+- `comment` (optional)
+
+The relationship can be either the Jira link type name, or the outward/inward relationship text such as `blocks` or `is blocked by`.
+
+#### `jira_delete_issue_link`
+
+Delete a link either by link ID or by resolving a relationship between two issue keys.
+
+Parameters:
+
+- `linkId` (optional)
+- `fromIssueKey` (optional)
+- `toIssueKey` (optional)
+- `relationship` (optional)
+
+Provide either:
+
+- `linkId`
+- or `fromIssueKey` + `toIssueKey` + `relationship`
+
+### Attachment tools
+
+#### `jira_get_attachment`
+
+Fetch attachment metadata by Jira attachment ID.
+
+Parameters:
+
+- `attachmentId` (required)
+
+#### `jira_download_attachment`
+
+Download attachment content through authenticated MCP access.
+
+Parameters:
+
+- `attachmentId` (required)
+- `format` (optional: `auto`, `text`, `base64`)
+- `maxBytes` (optional, default `262144`)
+
+Behavior:
+
+- `auto` returns UTF-8 for text-like files and Base64 for binary files
+- Large files are blocked unless `maxBytes` is increased
+- The server performs the authenticated Jira download for you; do not rely on raw attachment URLs in the assistant
+
+## Authentication Notes
+
+### Personal Access Tokens
+
+How PATs are created depends on the Jira deployment and version, but in most self-hosted Jira setups you can create them from your profile or security settings.
+
+Use a token with the minimum permissions required for the tasks you want the assistant to perform.
+
+### Reverse proxies and SSO
+
+If your Jira API requests are redirected to SSO or `login.jsp` even though the PAT is valid, your deployment may be behind a proxy such as:
+
+- `oauth2-proxy`
+- `nginx`
+- another gateway that filters by `User-Agent`
+
+In that case, set `JIRA_USER_AGENT` to a whitelisted value accepted by your environment.
+
+## Troubleshooting
+
+### The MCP host does not see my changes
+
+- Run `npm run build`
+- Make sure your MCP config points to `build/index.js`
+- Restart the MCP host application after rebuilding
+
+### Jira API requests return unauthorized or login redirects
+
+- Verify `JIRA_BASE_URL`
+- Verify the PAT is still valid
+- Verify the PAT has permission for the target project or issue
+- Try setting `JIRA_USER_AGENT`
+
+### Raw Jira attachment URLs fail
+
+This is expected in many MCP setups.
+
+Raw URLs such as:
+
+- `/secure/attachment/...`
+- `/rest/api/2/attachment/<id>`
+
+may fail when opened directly by the host because the assistant session does not share your browser login state. Use `jira_get_attachment` or `jira_download_attachment` instead.
+
+### `jira_delete_issue` is missing
+
+Set:
+
+```env
+JIRA_ALLOW_ISSUE_DELETE=true
 ```
-List all Jira projects
-```
 
-### 8. `jira_get_project`
-Get details of a specific project.
-
-**Parameters:**
-- `projectKey` (string, required): Project key
-
-### 9. `jira_get_issue_types`
-Get available issue types for a project.
-
-**Parameters:**
-- `projectKey` (string, required): Project key
-
-### 10. `jira_get_issue_link_types`
-Get available Jira issue link types, including their `name`, `outward`, and `inward` text.
-
-**Parameters:** None
-
-**Example:**
-```
-Show me the available Jira issue link types
-```
-
-### 11. `jira_create_issue_link`
-Create a Jira issue link between two issues.
-
-**Parameters:**
-- `fromIssueKey` (string, required): Source issue key
-- `toIssueKey` (string, required): Target issue key
-- `relationship` (string, required): Link type name or directional text, such as `Relates`, `blocks`, `is blocked by`, `duplicates`
-- `comment` (string, optional): Comment to add while creating the link
-
-**Direction Rules:**
-- The `relationship` is interpreted from `fromIssueKey` to `toIssueKey`
-- Example: `fromIssueKey=PROJ-1`, `toIssueKey=PROJ-2`, `relationship="blocks"` means `PROJ-1` blocks `PROJ-2`
-- Example: `fromIssueKey=PROJ-1`, `toIssueKey=PROJ-2`, `relationship="is blocked by"` means `PROJ-1` is blocked by `PROJ-2`
-- If you pass a link type name like `Blocks` or `Duplicate`, the server uses the type's outward direction by default
-
-**Examples:**
-```
-Create an issue link where PROJ-101 blocks PROJ-202
-```
-
-```
-Create an issue link from PROJ-202 to PROJ-101 with relationship "is blocked by"
-```
-
-```
-Link PROJ-300 to PROJ-301 as duplicates
-```
-
-### 12. `jira_delete_issue_link`
-Delete a Jira issue link.
-
-**Parameters:**
-- `linkId` (string, optional): Delete directly by Jira issue link ID
-- `fromIssueKey` (string, optional): Source issue key when deleting by relationship
-- `toIssueKey` (string, optional): Target issue key when deleting by relationship
-- `relationship` (string, optional): Relationship or type used to resolve the link
-
-**Usage Notes:**
-- Provide either `linkId`
-- Or provide `fromIssueKey`, `toIssueKey`, and `relationship`
-
-**Examples:**
-```
-Delete the issue link with ID 12345
-```
-
-```
-Delete the issue link where PROJ-101 blocks PROJ-202
-```
-
-### 13. `jira_assign_issue`
-Assign a Jira issue to a user.
-
-**Parameters:**
-- `issueKey` (string, required): Issue key
-- `assignee` (string, required): Username to assign to
-
-### 14. `jira_delete_issue`
-Delete a Jira issue permanently.
-
-**Parameters:**
-- `issueKey` (string, required): Issue key to delete
-- `confirmation` (string, required): Must be exactly `"DELETE"`
-
-**Safety requirements:**
-- `JIRA_ALLOW_ISSUE_DELETE` must be set to `true`
-- `confirmation` must be passed as `"DELETE"`
-
-**⚠️ Warning:** This action is permanent and cannot be undone.
-
-### 15. `jira_get_current_user`
-Get information about the currently authenticated user.
-
-**Parameters:** None
-
-### 16. `jira_get_attachment`
-Get Jira attachment metadata by attachment id.
-
-**Parameters:**
-- `attachmentId` (string, required): Jira attachment id
-
-**Example:**
-```
-Get metadata for attachment 10873
-```
-
-### 17. `jira_download_attachment`
-Download a Jira attachment through the authenticated MCP server.
-
-**Parameters:**
-- `attachmentId` (string, required): Jira attachment id
-- `format` (string, optional): `auto`, `text`, or `base64`. Default: `auto`
-- `maxBytes` (number, optional): Maximum attachment size to return. Default: `262144`
-
-**Usage notes:**
-- `auto` returns UTF-8 text for text-like files and `base64` for binary files
-- Large attachments are blocked unless `maxBytes` is increased explicitly
-- Use this instead of opening raw Jira attachment URLs when your assistant does not share a browser session
-
-**Example:**
-```
-Download attachment 10873 as text
-```
+and restart the host application.
 
 ## Development
 
-### Build the server
+Install dependencies:
+
+```bash
+npm install
+```
+
+Build:
+
 ```bash
 npm run build
 ```
 
-### Watch mode for development
+Watch mode:
+
 ```bash
 npm run watch
 ```
 
-### Run in development mode
+Run directly in development:
+
 ```bash
 npm run dev
 ```
 
-## Testing the Server
+## Security
 
-After configuring the server, restart Claude Desktop or VS Code to load the new MCP server.
-
-### Quick Test Commands
-
-1. **Test authentication:**
-   ```
-   Get my current Jira user information
-   ```
-
-2. **List projects:**
-   ```
-   Show me all Jira projects
-   ```
-
-3. **Search for issues:**
-   ```
-   Search for all issues assigned to me that are not done
-   ```
-
-4. **Create an issue:**
-   ```
-   Create a new task in project PROJ with summary "Test MCP integration"
-   ```
-
-5. **Create an issue link:**
-   ```
-   Create an issue link where PROJ-101 blocks PROJ-102
-   ```
-
-## Troubleshooting
-
-### Server not connecting
-- Verify the absolute path in your configuration
-- Ensure the server is built (`npm run build`)
-- Check that environment variables are set correctly
-- Restart Claude Desktop or VS Code after configuration changes
-
-### Authentication errors
-- Verify your Personal Access Token is still valid
-- Check that the token has not expired
-- Ensure the token has appropriate permissions
-- Verify the JIRA_BASE_URL is correct (no trailing slash)
-
-### API errors
-- Check Jira server logs for detailed error messages
-- Verify the Jira API is accessible from your machine
-- Ensure your user account has necessary permissions
-- Try accessing the REST API directly: `https://jira.domain.com/rest/api/2/myself`
-
-### Common issues
-- **"Cannot find module"**: Run `npm install` and `npm run build`
-- **"Connection refused"**: Check if Jira server is accessible and URL is correct
-- **"Unauthorized"**: Verify your Personal Access Token
-- **"Issue type not found"**: Use `jira_get_issue_types` to see valid types for the project
-- **"Issue link relationship not found"**: Use `jira_get_issue_link_types` to see valid link types and their inward/outward text
-- **"You do not have permission to view attachment with id: <id>"**: Opening a raw Jira attachment URL does not reuse the MCP server's PAT. Fetch the attachment via `jira_get_attachment` or `jira_download_attachment` instead.
-- **API requests redirect to SSO login**: Your Jira may be behind a reverse proxy (oauth2-proxy, nginx) that filters by User-Agent. Set `JIRA_USER_AGENT` environment variable to a whitelisted User-Agent string. Contact your system administrator to get the allowed User-Agent value.
-
-## Security Best Practices
-
-1. **Never commit your Personal Access Token** to version control
-2. Store tokens securely in configuration files with restricted permissions
-3. Use tokens with minimal required permissions
-4. Set expiration dates for tokens
-5. Rotate tokens regularly
-6. Monitor token usage in Jira's audit logs
-
-## API Reference
-
-This MCP server uses the Jira REST API v2. For more information about Jira's API:
-- Jira REST API documentation: `https://your-jira-instance/rest/api/2/`
-- JQL syntax guide: Check your Jira instance documentation
+- Never commit a real PAT
+- Keep `.env` files out of version control
+- Prefer tokens with the narrowest possible scope
+- Leave `JIRA_ALLOW_ISSUE_DELETE` disabled unless you explicitly need destructive actions
 
 ## License
 
 MIT
-
-## Support
-
-For issues related to:
-- **MCP Server**: Check the logs in Claude Desktop or VS Code
-- **Jira API**: Refer to your self-hosted Jira documentation
-- **Authentication**: Contact your Jira administrator
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-- Code follows TypeScript best practices
-- All tools are properly documented
-- Error handling is comprehensive
-- Security best practices are followed
