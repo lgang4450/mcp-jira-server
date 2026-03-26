@@ -21,6 +21,48 @@ const JIRA_PAT = process.env.JIRA_PAT;
 const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
 const JIRA_ALLOW_ISSUE_DELETE = process.env.JIRA_ALLOW_ISSUE_DELETE === 'true';
 const DELETE_ISSUE_CONFIRMATION_VALUE = 'DELETE';
+const DEFAULT_ATTACHMENT_DOWNLOAD_MAX_BYTES = 256 * 1024;
+
+type AttachmentContentFormat = 'auto' | 'text' | 'base64';
+
+function normalizeAttachmentFormat(value: unknown): AttachmentContentFormat {
+  if (value === undefined || value === 'auto' || value === 'text' || value === 'base64') {
+    return (value ?? 'auto') as AttachmentContentFormat;
+  }
+
+  throw new Error('format must be one of: auto, text, base64');
+}
+
+function normalizeAttachmentMaxBytes(value: unknown): number {
+  if (value === undefined) {
+    return DEFAULT_ATTACHMENT_DOWNLOAD_MAX_BYTES;
+  }
+
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new Error('maxBytes must be a positive number.');
+  }
+
+  return Math.floor(value);
+}
+
+function isTextLikeAttachment(mimeType?: string): boolean {
+  if (!mimeType) {
+    return false;
+  }
+
+  const normalizedMimeType = mimeType.toLowerCase();
+  return normalizedMimeType.startsWith('text/')
+    || normalizedMimeType === 'application/json'
+    || normalizedMimeType === 'application/xml'
+    || normalizedMimeType === 'application/javascript'
+    || normalizedMimeType === 'application/x-javascript'
+    || normalizedMimeType.endsWith('+json')
+    || normalizedMimeType.endsWith('+xml');
+}
+
+function getAttachmentAccessHint(attachmentId: string): string {
+  return `Direct Jira attachment URLs require Jira authentication headers or a browser session. Use jira_download_attachment with attachmentId="${attachmentId}" to fetch the file through the authenticated MCP server.`;
+}
 
 // Function to check if environment variables are configured
 function checkEnvironmentConfig(): { isConfigured: boolean; error?: string } {
@@ -379,6 +421,45 @@ const tools: Tool[] = [
       properties: {},
     },
   },
+  {
+    name: 'jira_get_attachment',
+    description: 'Get Jira attachment metadata by attachment id. Use this when raw Jira attachment URLs fail without authentication.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        attachmentId: {
+          type: 'string',
+          description: 'The Jira attachment id',
+        },
+      },
+      required: ['attachmentId'],
+    },
+  },
+  {
+    name: 'jira_download_attachment',
+    description: 'Download a Jira attachment through the authenticated MCP server and return it as text or base64.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        attachmentId: {
+          type: 'string',
+          description: 'The Jira attachment id',
+        },
+        format: {
+          type: 'string',
+          enum: ['auto', 'text', 'base64'],
+          description: 'How to encode the returned content. "auto" returns UTF-8 text for text-like files and base64 otherwise.',
+          default: 'auto',
+        },
+        maxBytes: {
+          type: 'number',
+          description: `Maximum attachment size to return in bytes (default: ${DEFAULT_ATTACHMENT_DOWNLOAD_MAX_BYTES})`,
+          default: DEFAULT_ATTACHMENT_DOWNLOAD_MAX_BYTES,
+        },
+      },
+      required: ['attachmentId'],
+    },
+  },
 ];
 
 const availableTools = JIRA_ALLOW_ISSUE_DELETE
@@ -632,6 +713,59 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(user, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'jira_get_attachment': {
+        const attachmentId = args.attachmentId as string;
+        const attachment = await getJiraClient().getAttachment(attachmentId);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ...attachment,
+                contentUrlRequiresAuthentication: true,
+                accessHint: getAttachmentAccessHint(attachmentId),
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'jira_download_attachment': {
+        const attachmentId = args.attachmentId as string;
+        const format = normalizeAttachmentFormat(args.format);
+        const maxBytes = normalizeAttachmentMaxBytes(args.maxBytes);
+        const download = await getJiraClient().downloadAttachment(attachmentId);
+
+        if (download.content.length > maxBytes) {
+          throw new Error(
+            `Attachment ${attachmentId} is ${download.content.length} bytes, which exceeds maxBytes=${maxBytes}. Increase maxBytes to download it, or use jira_get_attachment to inspect metadata only.`
+          );
+        }
+
+        const encoding = format === 'base64'
+          ? 'base64'
+          : format === 'text'
+            ? 'utf8'
+            : isTextLikeAttachment(download.metadata.mimeType)
+              ? 'utf8'
+              : 'base64';
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                metadata: download.metadata,
+                contentEncoding: encoding,
+                content: download.content.toString(encoding),
+                contentUrlRequiresAuthentication: true,
+                accessHint: getAttachmentAccessHint(attachmentId),
+              }, null, 2),
             },
           ],
         };

@@ -184,6 +184,26 @@ export interface JiraComment {
   updated: string;
 }
 
+export interface JiraAttachment {
+  id: string;
+  filename: string;
+  author?: {
+    displayName?: string;
+    emailAddress?: string;
+    name?: string;
+  };
+  created?: string;
+  size: number;
+  mimeType?: string;
+  content?: string;
+  thumbnail?: string;
+}
+
+export interface JiraAttachmentDownload {
+  metadata: JiraAttachment;
+  content: Buffer;
+}
+
 export class JiraClient {
   private client: AxiosInstance;
   private baseUrl: string;
@@ -438,6 +458,32 @@ export class JiraClient {
     return response.data;
   }
 
+  async getAttachment(attachmentId: string): Promise<JiraAttachment> {
+    const response = await this.client.get(`/attachment/${attachmentId}`);
+    return response.data;
+  }
+
+  async downloadAttachment(attachmentId: string): Promise<JiraAttachmentDownload> {
+    const metadata = await this.getAttachment(attachmentId);
+
+    if (!metadata.content) {
+      throw new Error(`Attachment ${attachmentId} does not provide a downloadable content URL.`);
+    }
+
+    const response = await this.client.get<ArrayBuffer>(this.resolveJiraUrl(metadata.content), {
+      headers: {
+        Accept: '*/*',
+      },
+      responseType: 'arraybuffer',
+      transformResponse: response => response,
+    });
+
+    return {
+      metadata,
+      content: Buffer.from(response.data),
+    };
+  }
+
   private async resolveIssueLinkType(relationship: string): Promise<ResolvedIssueLinkType> {
     if (!relationship?.trim()) {
       throw new Error('relationship is required to resolve an issue link type.');
@@ -523,5 +569,9 @@ export class JiraClient {
     }
 
     return matchingIssueLink;
+  }
+
+  private resolveJiraUrl(pathOrUrl: string): string {
+    return new URL(pathOrUrl, this.baseUrl).toString();
   }
 }

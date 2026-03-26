@@ -347,6 +347,35 @@ Get information about the currently authenticated user.
 
 **Parameters:** None
 
+### 16. `jira_get_attachment`
+Get Jira attachment metadata by attachment id.
+
+**Parameters:**
+- `attachmentId` (string, required): Jira attachment id
+
+**Example:**
+```
+Get metadata for attachment 10873
+```
+
+### 17. `jira_download_attachment`
+Download a Jira attachment through the authenticated MCP server.
+
+**Parameters:**
+- `attachmentId` (string, required): Jira attachment id
+- `format` (string, optional): `auto`, `text`, or `base64`. Default: `auto`
+- `maxBytes` (number, optional): Maximum attachment size to return. Default: `262144`
+
+**Usage notes:**
+- `auto` returns UTF-8 text for text-like files and `base64` for binary files
+- Large attachments are blocked unless `maxBytes` is increased explicitly
+- Use this instead of opening raw Jira attachment URLs when your assistant does not share a browser session
+
+**Example:**
+```
+Download attachment 10873 as text
+```
+
 ## Development
 
 ### Build the server
@@ -421,6 +450,7 @@ After configuring the server, restart Claude Desktop or VS Code to load the new 
 - **"Unauthorized"**: Verify your Personal Access Token
 - **"Issue type not found"**: Use `jira_get_issue_types` to see valid types for the project
 - **"Issue link relationship not found"**: Use `jira_get_issue_link_types` to see valid link types and their inward/outward text
+- **"You do not have permission to view attachment with id: <id>"**: Opening a raw Jira attachment URL does not reuse the MCP server's PAT. Fetch the attachment via `jira_get_attachment` or `jira_download_attachment` instead.
 - **API requests redirect to SSO login**: Your Jira may be behind a reverse proxy (oauth2-proxy, nginx) that filters by User-Agent. Set `JIRA_USER_AGENT` environment variable to a whitelisted User-Agent string. Contact your system administrator to get the allowed User-Agent value.
 
 ## Security Best Practices
