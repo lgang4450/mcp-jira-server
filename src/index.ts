@@ -10,6 +10,7 @@ import {
 import {
   JiraClient,
   CreateIssueInput,
+  CreateSubtaskInput,
   UpdateIssueInput,
   CreateIssueLinkInput,
   DeleteIssueLinkInput,
@@ -191,6 +192,116 @@ const tools: Tool[] = [
         },
       },
       required: ['projectKey', 'summary', 'issueType'],
+    },
+  },
+  {
+    name: 'jira_create_subtask',
+    description: 'Create a new Jira subtask under a parent issue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        parentIssueKey: {
+          type: 'string',
+          description: 'The parent Jira issue key (e.g., PROJ-123)',
+        },
+        projectKey: {
+          type: 'string',
+          description: 'Project key for the subtask. If omitted, the parent issue project is used.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Brief summary/title of the subtask',
+        },
+        description: {
+          type: 'string',
+          description: 'Detailed description of the subtask',
+        },
+        issueType: {
+          type: 'string',
+          description: 'Subtask issue type name (default: Sub-task)',
+          default: 'Sub-task',
+        },
+        priority: {
+          type: 'string',
+          description: 'Priority level (e.g., High, Medium, Low)',
+        },
+        assignee: {
+          type: 'string',
+          description: 'Username of the person to assign the subtask to',
+        },
+        labels: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          description: 'Array of labels to add to the subtask',
+        },
+        components: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          description: 'Array of component names',
+        },
+        customFields: {
+          type: 'object',
+          description: 'Map of Jira custom fields only (keys must match customfield_<digits>, e.g., customfield_10211)',
+          propertyNames: {
+            pattern: '^customfield_[0-9]+$',
+          },
+          additionalProperties: true,
+        },
+      },
+      required: ['parentIssueKey', 'summary'],
+    },
+  },
+  {
+    name: 'jira_update_subtask',
+    description: 'Update an existing Jira subtask after verifying the issue is a subtask',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira subtask issue key to update',
+        },
+        summary: {
+          type: 'string',
+          description: 'New summary/title for the subtask',
+        },
+        description: {
+          type: 'string',
+          description: 'New description for the subtask',
+        },
+        assignee: {
+          type: 'string',
+          description: 'Username to assign the subtask to',
+        },
+        priority: {
+          type: 'string',
+          description: 'New priority level',
+        },
+        labels: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          description: 'New array of labels',
+        },
+        status: {
+          type: 'string',
+          description: 'New status/workflow state (e.g., "In Progress", "Done")',
+        },
+        customFields: {
+          type: 'object',
+          description: 'Map of Jira custom fields only (keys must match customfield_<digits>, e.g., customfield_10211)',
+          propertyNames: {
+            pattern: '^customfield_[0-9]+$',
+          },
+          additionalProperties: true,
+        },
+      },
+      required: ['issueKey'],
     },
   },
   {
@@ -537,6 +648,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Successfully created issue ${issue.key}\n\n${JSON.stringify(issue, null, 2)}`,
+            },
+          ],
+        };
+      }
+
+      case 'jira_create_subtask': {
+        const input: CreateSubtaskInput = {
+          parentIssueKey: args.parentIssueKey as string,
+          projectKey: args.projectKey as string | undefined,
+          summary: args.summary as string,
+          description: args.description as string | undefined,
+          issueType: args.issueType as string | undefined,
+          priority: args.priority as string | undefined,
+          assignee: args.assignee as string | undefined,
+          labels: args.labels as string[] | undefined,
+          components: args.components as string[] | undefined,
+          customFields: args.customFields as Record<string, unknown> | undefined,
+        };
+        const issue = await getJiraClient().createSubtask(input);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully created subtask ${issue.key} under ${input.parentIssueKey}\n\n${JSON.stringify(issue, null, 2)}`,
+            },
+          ],
+        };
+      }
+
+      case 'jira_update_subtask': {
+        const input: UpdateIssueInput = {
+          summary: args.summary as string,
+          description: args.description as string,
+          assignee: args.assignee as string,
+          priority: args.priority as string,
+          labels: args.labels as string[],
+          customFields: args.customFields as Record<string, unknown>,
+          status: args.status as string,
+        };
+        const issue = await getJiraClient().updateSubtask(args.issueKey as string, input);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully updated subtask ${issue.key}\n\n${JSON.stringify(issue, null, 2)}`,
             },
           ],
         };

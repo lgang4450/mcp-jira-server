@@ -26,6 +26,8 @@ This project exposes Jira operations as MCP tools so assistants such as Claude D
 | `jira_get_issue` | Fetch a single issue by key |
 | `jira_search_issues` | Run JQL search queries |
 | `jira_create_issue` | Create a new issue |
+| `jira_create_subtask` | Create a subtask under a parent issue |
+| `jira_update_subtask` | Update an existing subtask |
 | `jira_update_issue` | Update fields and optionally transition status |
 | `jira_add_comment` | Add a comment to an issue |
 | `jira_get_comments` | List comments for an issue |
@@ -211,6 +213,44 @@ Parameters:
 - `components` (optional)
 - `customFields` (optional)
 
+`customFields` accepts only keys matching `customfield_<digits>`.
+
+#### `jira_create_subtask`
+
+Create a new subtask under a parent issue.
+
+Parameters:
+
+- `parentIssueKey` (required)
+- `summary` (required)
+- `projectKey` (optional, defaults to the parent issue project)
+- `issueType` (optional, default `Sub-task`)
+- `description` (optional)
+- `priority` (optional)
+- `assignee` (optional)
+- `labels` (optional)
+- `components` (optional)
+- `customFields` (optional)
+
+Use `issueType` when your Jira instance uses a different or localized subtask issue type name.
+`customFields` accepts only keys matching `customfield_<digits>`.
+
+#### `jira_update_subtask`
+
+Update an existing subtask after verifying that the issue is a subtask.
+
+Parameters:
+
+- `issueKey` (required)
+- `summary` (optional)
+- `description` (optional)
+- `assignee` (optional)
+- `priority` (optional)
+- `labels` (optional)
+- `status` (optional)
+- `customFields` (optional)
+
+If `status` is provided, the server resolves the matching Jira transition and applies it after the field update.
 `customFields` accepts only keys matching `customfield_<digits>`.
 
 #### `jira_update_issue`

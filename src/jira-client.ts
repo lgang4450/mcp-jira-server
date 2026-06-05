@@ -81,6 +81,7 @@ export interface JiraIssue {
     };
     issuetype: {
       name: string;
+      subtask?: boolean;
     };
     priority?: {
       name: string;
@@ -92,6 +93,9 @@ export interface JiraIssue {
     reporter?: {
       displayName: string;
       emailAddress: string;
+    };
+    project?: {
+      key: string;
     };
     created: string;
     updated: string;
@@ -154,6 +158,20 @@ export interface CreateIssueInput {
   summary: string;
   description?: string;
   issueType: string;
+  priority?: string;
+  assignee?: string;
+  labels?: string[];
+  components?: string[];
+  // Pass-through map for Jira custom fields (e.g., { customfield_10211: 10015 })
+  customFields?: Record<string, unknown>;
+}
+
+export interface CreateSubtaskInput {
+  parentIssueKey: string;
+  projectKey?: string;
+  summary: string;
+  description?: string;
+  issueType?: string;
   priority?: string;
   assignee?: string;
   labels?: string[];
@@ -242,44 +260,26 @@ export class JiraClient {
   }
 
   async createIssue(input: CreateIssueInput): Promise<JiraIssue> {
-    const issueData: any = {
-      fields: {
-        project: {
-          key: input.projectKey
-        },
-        summary: input.summary,
-        issuetype: {
-          name: input.issueType
-        }
-      }
+    const issueData = {
+      fields: this.buildCreateIssueFields(input)
     };
 
-    if (input.description) {
-      issueData.fields.description = input.description;
-    }
-
-    if (input.priority) {
-      issueData.fields.priority = { name: input.priority };
-    }
-
-    if (input.assignee) {
-      issueData.fields.assignee = { name: input.assignee };
-    }
-
-    if (input.labels && input.labels.length > 0) {
-      issueData.fields.labels = input.labels;
-    }
-
-    if (input.components && input.components.length > 0) {
-      issueData.fields.components = input.components.map(c => ({ name: c }));
-    }
-
-    const sanitizedCustomFields = sanitizeCustomFields(input.customFields);
-    if (sanitizedCustomFields) {
-      Object.assign(issueData.fields, sanitizedCustomFields);
-    }
-
     const response = await this.client.post('/issue', issueData);
+    return await this.getIssue(response.data.key);
+  }
+
+  async createSubtask(input: CreateSubtaskInput): Promise<JiraIssue> {
+    const parentIssueKey = normalizeIssueKey(input.parentIssueKey);
+    const projectKey = input.projectKey || await this.getProjectKeyForIssue(parentIssueKey);
+    const fields = this.buildCreateIssueFields({
+      ...input,
+      projectKey,
+      issueType: input.issueType || 'Sub-task'
+    });
+
+    fields.parent = { key: parentIssueKey };
+
+    const response = await this.client.post('/issue', { fields });
     return await this.getIssue(response.data.key);
   }
 
@@ -321,6 +321,71 @@ export class JiraClient {
     }
 
     return await this.getIssue(issueKey);
+  }
+
+  async updateSubtask(issueKey: string, input: UpdateIssueInput): Promise<JiraIssue> {
+    await this.assertSubtaskIssue(issueKey);
+    return await this.updateIssue(issueKey, input);
+  }
+
+  private buildCreateIssueFields(input: CreateIssueInput): Record<string, unknown> {
+    const fields: Record<string, unknown> = {
+      project: {
+        key: input.projectKey
+      },
+      summary: input.summary,
+      issuetype: {
+        name: input.issueType
+      }
+    };
+
+    if (input.description) {
+      fields.description = input.description;
+    }
+
+    if (input.priority) {
+      fields.priority = { name: input.priority };
+    }
+
+    if (input.assignee) {
+      fields.assignee = { name: input.assignee };
+    }
+
+    if (input.labels && input.labels.length > 0) {
+      fields.labels = input.labels;
+    }
+
+    if (input.components && input.components.length > 0) {
+      fields.components = input.components.map(c => ({ name: c }));
+    }
+
+    const sanitizedCustomFields = sanitizeCustomFields(input.customFields);
+    if (sanitizedCustomFields) {
+      Object.assign(fields, sanitizedCustomFields);
+    }
+
+    return fields;
+  }
+
+  private async getProjectKeyForIssue(issueKey: string): Promise<string> {
+    const issue = await this.getIssue(issueKey);
+    if (issue.fields.project?.key) {
+      return issue.fields.project.key;
+    }
+
+    const separatorIndex = issueKey.indexOf('-');
+    if (separatorIndex > 0) {
+      return issueKey.slice(0, separatorIndex);
+    }
+
+    throw new Error(`Could not resolve project key for parent issue: ${issueKey}`);
+  }
+
+  private async assertSubtaskIssue(issueKey: string): Promise<void> {
+    const issue = await this.getIssue(issueKey);
+    if (issue.fields.issuetype.subtask !== true) {
+      throw new Error(`${issueKey} is not a subtask issue.`);
+    }
   }
 
   async transitionIssue(issueKey: string, statusName: string): Promise<void> {
