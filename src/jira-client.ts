@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import FormData from 'form-data';
 
 const CUSTOM_FIELD_KEY_PATTERN = /^customfield_\d+$/;
 const BLOCKED_CUSTOM_FIELD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -220,6 +221,13 @@ export interface JiraAttachment {
 export interface JiraAttachmentDownload {
   metadata: JiraAttachment;
   content: Buffer;
+}
+
+export interface UploadAttachmentInput {
+  issueKey: string;
+  filename: string;
+  content: Buffer;
+  mimeType?: string;
 }
 
 export class JiraClient {
@@ -525,6 +533,50 @@ export class JiraClient {
 
   async getAttachment(attachmentId: string): Promise<JiraAttachment> {
     const response = await this.client.get(`/attachment/${attachmentId}`);
+    return response.data;
+  }
+
+  async uploadAttachment(input: UploadAttachmentInput): Promise<JiraAttachment[]> {
+    const issueKey = normalizeIssueKey(input.issueKey);
+    const filename = input.filename.trim();
+
+    if (!issueKey) {
+      throw new Error('issueKey is required to upload an attachment.');
+    }
+
+    if (!filename) {
+      throw new Error('filename is required to upload an attachment.');
+    }
+
+    if (/[\\/\0\r\n]/.test(filename)) {
+      throw new Error('filename must not contain path separators, null bytes, or line breaks.');
+    }
+
+    if (input.mimeType && /[\0\r\n]/.test(input.mimeType)) {
+      throw new Error('mimeType must not contain null bytes or line breaks.');
+    }
+
+    const form = new FormData();
+    form.append('file', input.content, {
+      filename,
+      contentType: input.mimeType || 'application/octet-stream',
+      knownLength: input.content.length,
+    });
+
+    const response = await this.client.post<JiraAttachment[]>(
+      `/issue/${encodeURIComponent(issueKey)}/attachments`,
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          Accept: 'application/json',
+          'Content-Length': form.getLengthSync(),
+          'X-Atlassian-Token': 'no-check',
+        },
+        maxBodyLength: Infinity,
+      },
+    );
+
     return response.data;
   }
 

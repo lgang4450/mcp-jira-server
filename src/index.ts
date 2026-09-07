@@ -23,6 +23,7 @@ const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
 const JIRA_ALLOW_ISSUE_DELETE = process.env.JIRA_ALLOW_ISSUE_DELETE === 'true';
 const DELETE_ISSUE_CONFIRMATION_VALUE = 'DELETE';
 const DEFAULT_ATTACHMENT_DOWNLOAD_MAX_BYTES = 256 * 1024;
+const DEFAULT_ATTACHMENT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
 type AttachmentContentFormat = 'auto' | 'text' | 'base64';
 
@@ -44,6 +45,36 @@ function normalizeAttachmentMaxBytes(value: unknown): number {
   }
 
   return Math.floor(value);
+}
+
+function getAttachmentUploadMaxBytes(): number {
+  const configuredValue = process.env.JIRA_ATTACHMENT_UPLOAD_MAX_BYTES;
+  if (configuredValue === undefined) {
+    return DEFAULT_ATTACHMENT_UPLOAD_MAX_BYTES;
+  }
+
+  const parsedValue = Number(configuredValue);
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    throw new Error('JIRA_ATTACHMENT_UPLOAD_MAX_BYTES must be a positive number.');
+  }
+
+  return Math.floor(parsedValue);
+}
+
+function decodeBase64Attachment(value: unknown): Buffer {
+  if (typeof value !== 'string') {
+    throw new Error('contentBase64 must be a Base64-encoded string.');
+  }
+
+  const normalizedValue = value.replace(/\s/g, '');
+  if (
+    normalizedValue.length % 4 !== 0
+    || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(normalizedValue)
+  ) {
+    throw new Error('contentBase64 is not valid Base64.');
+  }
+
+  return Buffer.from(normalizedValue, 'base64');
 }
 
 function isTextLikeAttachment(mimeType?: string): boolean {
@@ -547,6 +578,32 @@ const tools: Tool[] = [
     },
   },
   {
+    name: 'jira_upload_attachment',
+    description: 'Upload a Base64-encoded file as an attachment to a Jira issue.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key that will receive the attachment',
+        },
+        filename: {
+          type: 'string',
+          description: 'Filename to store in Jira, without directory components',
+        },
+        contentBase64: {
+          type: 'string',
+          description: 'Complete file content encoded as Base64',
+        },
+        mimeType: {
+          type: 'string',
+          description: 'Optional MIME type, for example application/pdf or image/png',
+        },
+      },
+      required: ['issueKey', 'filename', 'contentBase64'],
+    },
+  },
+  {
     name: 'jira_download_attachment',
     description: 'Download a Jira attachment through the authenticated MCP server and return it as text or base64.',
     inputSchema: {
@@ -886,6 +943,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 contentUrlRequiresAuthentication: true,
                 accessHint: getAttachmentAccessHint(attachmentId),
               }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'jira_upload_attachment': {
+        const issueKey = args.issueKey as string;
+        const filename = args.filename as string;
+        const content = decodeBase64Attachment(args.contentBase64);
+        const maxBytes = getAttachmentUploadMaxBytes();
+
+        if (content.length > maxBytes) {
+          throw new Error(
+            `Attachment is ${content.length} bytes, which exceeds the configured upload limit of ${maxBytes} bytes.`
+          );
+        }
+
+        const attachments = await getJiraClient().uploadAttachment({
+          issueKey,
+          filename,
+          content,
+          mimeType: args.mimeType as string | undefined,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully uploaded attachment ${filename} to ${issueKey}\n\n${JSON.stringify(attachments, null, 2)}`,
             },
           ],
         };

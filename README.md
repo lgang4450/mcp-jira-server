@@ -41,6 +41,7 @@ This project exposes Jira operations as MCP tools so assistants such as Claude D
 | `jira_delete_issue` | Permanently delete an issue, if explicitly enabled |
 | `jira_get_current_user` | Return the authenticated Jira user |
 | `jira_get_attachment` | Fetch attachment metadata |
+| `jira_upload_attachment` | Upload Base64-encoded attachment content to an issue |
 | `jira_download_attachment` | Download attachment content through authenticated MCP access |
 
 ## Requirements
@@ -371,6 +372,22 @@ Provide either:
 - or `fromIssueKey` + `toIssueKey` + `relationship`
 
 ### Attachment tools
+
+#### `jira_upload_attachment`
+
+Upload a file to an issue through the authenticated Jira connection.
+
+Parameters:
+
+- `issueKey` (required)
+- `filename` (required, without directory components)
+- `contentBase64` (required, complete file content encoded as Base64)
+- `mimeType` (optional, defaults to `application/octet-stream`)
+
+The decoded file size is limited to 10 MiB by default. Configure
+`JIRA_ATTACHMENT_UPLOAD_MAX_BYTES` to use a different server-side limit. Jira's
+own attachment setting and project permissions are applied in addition to this
+limit.
 
 #### `jira_get_attachment`
 

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test test/*.test.mjs",
     "watch": "tsc --watch",
     "prepare": "npm run build",
     "dev": "tsx src/index.ts"
@@ -33,7 +34,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "axios": "^1.7.9"
+    "axios": "^1.7.9",
+    "form-data": "^4.0.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
