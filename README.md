@@ -1,6 +1,6 @@
 # mcp-jira-server
 
-MCP server for self-hosted Jira instances using Personal Access Token (PAT) authentication.
+MCP server for self-hosted Jira instances using Personal Access Token (PAT) authentication, including deployments protected by an additional HTTP Basic Auth reverse proxy.
 
 This project exposes Jira operations as MCP tools so assistants such as Claude Desktop, VS Code, or any MCP-compatible client can search issues, update tickets, manage links, and download attachments from a Jira Server / Data Center deployment.
 
@@ -8,6 +8,7 @@ This project exposes Jira operations as MCP tools so assistants such as Claude D
 
 - Connects to a self-hosted Jira instance over the Jira REST API v2
 - Authenticates with a Jira Personal Access Token
+- Supports an optional HTTP Basic Auth layer in front of Jira, including Nginx Proxy Manager Access Lists
 - Exposes Jira capabilities as MCP tools over `stdio`
 - Supports issue search, create, update, comments, assignments, projects, issue types, links, current user lookup, and attachments
 - Keeps issue deletion disabled by default behind an explicit safety flag
@@ -82,6 +83,10 @@ The server reads configuration from environment variables.
 | `JIRA_BASE_URL` | Yes | Base URL of your Jira instance, for example `https://jira.example.com` |
 | `JIRA_PAT` | Yes | Jira Personal Access Token |
 | `JIRA_USER_AGENT` | No | Custom `User-Agent` for environments behind SSO proxies or reverse proxies |
+| `JIRA_PROXY_BASIC_AUTH_USERNAME` | No | Username for an HTTP Basic Auth reverse-proxy layer; must be set together with the password |
+| `JIRA_PROXY_BASIC_AUTH_PASSWORD` | No | Password for an HTTP Basic Auth reverse-proxy layer; must be set together with the username |
+| `JIRA_PROXY_JIRA_AUTH_HEADER` | No | Header used to carry the Jira PAT through the proxy; defaults to `X-Jira-Authorization` |
+| `JIRA_ATTACHMENT_UPLOAD_MAX_BYTES` | No | Maximum decoded attachment size accepted by the upload tool; defaults to 10 MiB |
 | `JIRA_ALLOW_ISSUE_DELETE` | No | Set to `true` to expose the destructive `jira_delete_issue` tool |
 
 Example `.env` values:
@@ -90,6 +95,9 @@ Example `.env` values:
 JIRA_BASE_URL=https://jira.example.com
 JIRA_PAT=your_personal_access_token
 # JIRA_USER_AGENT=YourAllowedUserAgent/1.0
+# JIRA_PROXY_BASIC_AUTH_USERNAME=npm-access-list-username
+# JIRA_PROXY_BASIC_AUTH_PASSWORD=npm-access-list-password
+# JIRA_PROXY_JIRA_AUTH_HEADER=X-Jira-Authorization
 # JIRA_ALLOW_ISSUE_DELETE=false
 ```
 
@@ -431,6 +439,49 @@ If your Jira API requests are redirected to SSO or `login.jsp` even though the P
 
 In that case, set `JIRA_USER_AGENT` to a whitelisted value accepted by your environment.
 
+### Nginx Proxy Manager Basic Auth in front of Jira
+
+Jira PAT authentication and an Nginx Proxy Manager Access List both use the HTTP
+`Authorization` header. A single request cannot use that header for both Basic and
+Bearer authentication, so the MCP server supports a separate forwarding header.
+
+Configure the MCP server:
+
+```env
+JIRA_BASE_URL=https://jira.example.com
+JIRA_PAT=your_personal_access_token
+JIRA_PROXY_BASIC_AUTH_USERNAME=npm-access-list-username
+JIRA_PROXY_BASIC_AUTH_PASSWORD=npm-access-list-password
+# Optional; this is the default:
+JIRA_PROXY_JIRA_AUTH_HEADER=X-Jira-Authorization
+```
+
+Then configure the `/` custom location for the Jira proxy host in Nginx Proxy
+Manager:
+
+1. Select the Basic Auth Access List for the custom location.
+2. Enable **Pass Auth to Host** on that Access List so NPM does not clear the
+   upstream `Authorization` header.
+3. Add this to the custom location's advanced configuration:
+
+```nginx
+proxy_set_header Authorization $http_x_jira_authorization;
+proxy_set_header X-Jira-Authorization "";
+```
+
+The incoming `Authorization: Basic ...` authenticates the request at NPM. NPM
+then replaces it with the Jira `Bearer` value from `X-Jira-Authorization` before
+forwarding the request to Jira. The second directive prevents the internal
+forwarding header from also being sent upstream.
+
+If `JIRA_PROXY_JIRA_AUTH_HEADER` is changed, update both Nginx directives to use
+the matching header. For example, `X-Internal-Jira-Auth` is available in Nginx as
+`$http_x_internal_jira_auth`.
+
+For the complete rollout order, validation checks, rollback procedure, and a
+ready-to-copy infrastructure-agent prompt, see
+[`NPM_BASIC_AUTH_ROLLOUT.md`](NPM_BASIC_AUTH_ROLLOUT.md).
+
 ## Troubleshooting
 
 ### The MCP host does not see my changes
@@ -445,6 +496,8 @@ In that case, set `JIRA_USER_AGENT` to a whitelisted value accepted by your envi
 - Verify the PAT is still valid
 - Verify the PAT has permission for the target project or issue
 - Try setting `JIRA_USER_AGENT`
+- If NPM Basic Auth is enabled, verify both proxy credentials, **Pass Auth to Host**,
+  and the PAT forwarding directives described above
 
 ### Raw Jira attachment URLs fail
 

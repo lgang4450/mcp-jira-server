@@ -3,6 +3,8 @@ import FormData from 'form-data';
 
 const CUSTOM_FIELD_KEY_PATTERN = /^customfield_\d+$/;
 const BLOCKED_CUSTOM_FIELD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const HTTP_HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+export const DEFAULT_JIRA_AUTH_FORWARD_HEADER = 'X-Jira-Authorization';
 
 function sanitizeCustomFields(customFields?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (customFields === undefined) {
@@ -70,6 +72,61 @@ export interface JiraConfig {
   baseUrl: string;
   personalAccessToken: string;
   userAgent?: string;
+  proxyBasicAuthUsername?: string;
+  proxyBasicAuthPassword?: string;
+  jiraAuthForwardHeader?: string;
+}
+
+export function buildJiraRequestHeaders(config: JiraConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+  const hasProxyUsername = config.proxyBasicAuthUsername !== undefined;
+  const hasProxyPassword = config.proxyBasicAuthPassword !== undefined;
+
+  if (hasProxyUsername !== hasProxyPassword) {
+    throw new Error(
+      'Proxy Basic Auth requires both JIRA_PROXY_BASIC_AUTH_USERNAME and JIRA_PROXY_BASIC_AUTH_PASSWORD.'
+    );
+  }
+
+  if (hasProxyUsername && hasProxyPassword) {
+    const proxyUsername = config.proxyBasicAuthUsername!;
+    const proxyPassword = config.proxyBasicAuthPassword!;
+
+    if (!proxyUsername || !proxyPassword) {
+      throw new Error(
+        'JIRA_PROXY_BASIC_AUTH_USERNAME and JIRA_PROXY_BASIC_AUTH_PASSWORD must not be empty.'
+      );
+    }
+
+    if (proxyUsername.includes(':')) {
+      throw new Error('JIRA_PROXY_BASIC_AUTH_USERNAME must not contain a colon.');
+    }
+
+    const jiraAuthForwardHeader = config.jiraAuthForwardHeader || DEFAULT_JIRA_AUTH_FORWARD_HEADER;
+    if (!HTTP_HEADER_NAME_PATTERN.test(jiraAuthForwardHeader)) {
+      throw new Error(`Invalid Jira auth forwarding header name: ${jiraAuthForwardHeader}`);
+    }
+
+    if (jiraAuthForwardHeader.toLowerCase() === 'authorization') {
+      throw new Error(
+        'The Jira auth forwarding header must differ from Authorization when Proxy Basic Auth is enabled.'
+      );
+    }
+
+    headers['Authorization'] = `Basic ${Buffer.from(`${proxyUsername}:${proxyPassword}`, 'utf8').toString('base64')}`;
+    headers[jiraAuthForwardHeader] = `Bearer ${config.personalAccessToken}`;
+  } else {
+    headers['Authorization'] = `Bearer ${config.personalAccessToken}`;
+  }
+
+  if (config.userAgent) {
+    headers['User-Agent'] = config.userAgent;
+  }
+
+  return headers;
 }
 
 export interface JiraIssue {
@@ -236,16 +293,7 @@ export class JiraClient {
 
   constructor(config: JiraConfig) {
     this.baseUrl = config.baseUrl;
-    
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${config.personalAccessToken}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
-    
-    if (config.userAgent) {
-      headers['User-Agent'] = config.userAgent;
-    }
+    const headers = buildJiraRequestHeaders(config);
     
     this.client = axios.create({
       baseURL: `${config.baseUrl}/rest/api/2`,

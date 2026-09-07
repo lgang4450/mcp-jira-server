@@ -45,6 +45,7 @@
   "files": [
     "build/**/*",
     "README.md",
+    "NPM_BASIC_AUTH_ROLLOUT.md",
     "LICENSE"
   ]
 }

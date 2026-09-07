@@ -17,9 +17,6 @@ import {
 } from './jira-client.js';
 
 // Environment variables
-const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
-const JIRA_PAT = process.env.JIRA_PAT;
-const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
 const JIRA_ALLOW_ISSUE_DELETE = process.env.JIRA_ALLOW_ISSUE_DELETE === 'true';
 const DELETE_ISSUE_CONFIRMATION_VALUE = 'DELETE';
 const DEFAULT_ATTACHMENT_DOWNLOAD_MAX_BYTES = 256 * 1024;
@@ -100,6 +97,10 @@ function getAttachmentAccessHint(attachmentId: string): string {
 function checkEnvironmentConfig(): { isConfigured: boolean; error?: string } {
   const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
   const JIRA_PAT = process.env.JIRA_PAT;
+  const JIRA_PROXY_BASIC_AUTH_USERNAME = process.env.JIRA_PROXY_BASIC_AUTH_USERNAME;
+  const JIRA_PROXY_BASIC_AUTH_PASSWORD = process.env.JIRA_PROXY_BASIC_AUTH_PASSWORD;
+  const hasProxyUsername = JIRA_PROXY_BASIC_AUTH_USERNAME !== undefined;
+  const hasProxyPassword = JIRA_PROXY_BASIC_AUTH_PASSWORD !== undefined;
   
   if (!JIRA_BASE_URL || !JIRA_PAT) {
     return {
@@ -107,6 +108,17 @@ function checkEnvironmentConfig(): { isConfigured: boolean; error?: string } {
       error: 'JIRA_BASE_URL and JIRA_PAT environment variables are required. Please configure them before using Jira functionality.'
     };
   }
+
+  if (
+    hasProxyUsername !== hasProxyPassword
+    || (hasProxyUsername && (!JIRA_PROXY_BASIC_AUTH_USERNAME || !JIRA_PROXY_BASIC_AUTH_PASSWORD))
+  ) {
+    return {
+      isConfigured: false,
+      error: 'JIRA_PROXY_BASIC_AUTH_USERNAME and JIRA_PROXY_BASIC_AUTH_PASSWORD must be configured together and must not be empty.'
+    };
+  }
+
   return { isConfigured: true };
 }
 
@@ -123,11 +135,17 @@ function getJiraClient(): JiraClient {
     const JIRA_BASE_URL = process.env.JIRA_BASE_URL!;
     const JIRA_PAT = process.env.JIRA_PAT!;
     const JIRA_USER_AGENT = process.env.JIRA_USER_AGENT;
+    const JIRA_PROXY_BASIC_AUTH_USERNAME = process.env.JIRA_PROXY_BASIC_AUTH_USERNAME;
+    const JIRA_PROXY_BASIC_AUTH_PASSWORD = process.env.JIRA_PROXY_BASIC_AUTH_PASSWORD;
+    const JIRA_PROXY_JIRA_AUTH_HEADER = process.env.JIRA_PROXY_JIRA_AUTH_HEADER;
     
     jiraClient = new JiraClient({
       baseUrl: JIRA_BASE_URL,
       personalAccessToken: JIRA_PAT,
       userAgent: JIRA_USER_AGENT,
+      proxyBasicAuthUsername: JIRA_PROXY_BASIC_AUTH_USERNAME,
+      proxyBasicAuthPassword: JIRA_PROXY_BASIC_AUTH_PASSWORD,
+      jiraAuthForwardHeader: JIRA_PROXY_JIRA_AUTH_HEADER,
     });
   }
   

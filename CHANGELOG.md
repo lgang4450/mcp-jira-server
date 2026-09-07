@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `jira_create_subtask` tool for creating subtasks under a parent Jira issue
 - `jira_update_subtask` tool for updating subtasks with subtask validation
+- Optional HTTP Basic Auth credentials for Jira deployments protected by an additional reverse-proxy layer such as an Nginx Proxy Manager Access List
+- Configurable forwarding header for carrying the Jira PAT through a Basic Auth reverse proxy
 
 ## [1.0.3] - 2026-01-27
 
